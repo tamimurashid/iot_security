@@ -1,0 +1,225 @@
+/* assets/css/style.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --primary-color: #4f46e5;
+    --primary-hover: #4338ca;
+    --secondary-color: #1e293b;
+    --background-color: #f8fafc;
+    --panel-bg: #ffffff;
+    --text-color: #334155;
+    --text-muted: #64748b;
+    --danger-color: #ef4444;
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --border-color: #e2e8f0;
+    --sidebar-width: 250px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+/* Typography & Utilities */
+h1, h2, h3 { color: var(--secondary-color); font-weight: 600; }
+.mt-20 { margin-top: 20px; }
+.w-100 { width: 100%; }
+.text-danger { color: var(--danger-color); font-weight: 600; }
+
+/* Login Page */
+.login-body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+}
+.login-container {
+    background: var(--panel-bg);
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    width: 100%;
+    max-width: 400px;
+}
+.login-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+.login-header i { font-size: 40px; color: var(--primary-color); margin-bottom: 10px; }
+
+/* Form Controls */
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; }
+.form-group input[type="text"],
+.form-group input[type="password"],
+.form-group input[type="email"],
+.form-group input[type="url"],
+.form-group input[type="number"] {
+    width: 100%;
+    padding: 10px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 15px;
+    transition: border-color 0.3s;
+}
+.form-group input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.checkbox-group label { margin-bottom: 0; }
+
+/* Buttons */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+.btn-sm { padding: 5px 10px; font-size: 13px; }
+.btn-primary { background-color: var(--primary-color); color: #fff; }
+.btn-primary:hover { background-color: var(--primary-hover); }
+.btn-warning { background-color: var(--warning-color); color: #fff; }
+.btn-success { background-color: var(--success-color); color: #fff; }
+
+/* Layout Wrapper */
+.wrapper {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    width: var(--sidebar-width);
+    background-color: var(--secondary-color);
+    color: #fff;
+    position: fixed;
+    height: 100%;
+    overflow-y: auto;
+}
+.sidebar-header {
+    padding: 20px;
+    background-color: rgba(0,0,0,0.1);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.nav-links { list-style: none; padding: 20px 0; }
+.nav-links li a {
+    display: block;
+    padding: 15px 25px;
+    color: rgba(255,255,255,0.7);
+    text-decoration: none;
+    transition: 0.3s;
+}
+.nav-links li a:hover, .nav-links li.active a {
+    background-color: rgba(255,255,255,0.1);
+    color: #fff;
+    border-left: 4px solid var(--primary-color);
+}
+.nav-links li a i { margin-right: 10px; width: 20px; text-align: center; }
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    padding: 30px;
+}
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    background: #fff;
+    padding: 15px 25px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+/* Dashboard Cards */
+.dashboard-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.card {
+    background: var(--panel-bg);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: center;
+}
+.card-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(79, 70, 229, 0.1);
+    color: var(--primary-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    margin-right: 20px;
+}
+.card-info h3 { font-size: 14px; color: var(--text-muted); margin-bottom: 5px; }
+.card-info p { font-size: 24px; font-weight: 700; color: var(--secondary-color); }
+
+/* Grid Layout */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+}
+.panel {
+    background: var(--panel-bg);
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+.panel h2 { font-size: 18px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+
+/* Tables */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.table th, .table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+.table th { font-weight: 600; color: var(--text-muted); background: #f8fafc; }
+
+/* Badges */
+.badge {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); }
+.badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); }
+.badge-warning { background: rgba(245, 158, 11, 0.1); color: var(--warning-color); }
+
+/* Alerts */
+.alert { padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+.alert-danger { background-color: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+.alert-success { background-color: #d1fae5; color: #065f46; border: 1px solid #34d399; }
