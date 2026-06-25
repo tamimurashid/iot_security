@@ -6,36 +6,70 @@ require_once '../../includes/NotificationEngine.php';
 
 header("Content-Type: application/json");
 
-// Read POST data
 $data = json_decode(file_get_contents("php://input"));
 
 if (!isset($data->api_key) || !validate_api_key($pdo, $data->api_key)) {
-    http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "Unauthorized"]);
-    exit();
+    json_response(["status" => "error", "message" => "Unauthorized"], 401);
 }
 
-// Check if system is armed before processing alert
 $deviceId = $data->device_id ?? 'ESP32_NODE_01';
-$stmt = $pdo->prepare("SELECT security_mode FROM devices WHERE device_id = ?");
+$alertType = $data->alert_type ?? 'Unknown Intrusion';
+$sensorSource = $data->sensor ?? 'Unknown Sensor';
+$confidence = $data->confidence ?? 100;
+
+// Check if system is armed
+$stmt = $pdo->prepare("SELECT security_mode, is_active FROM devices WHERE device_id = ?");
 $stmt->execute([$deviceId]);
 $device = $stmt->fetch();
 
-if (!$device || $device['security_mode'] !== 'Armed') {
-    echo json_encode(["status" => "success", "message" => "Ignored - System is Disarmed"]);
-    exit();
+$status = 'Unresolved';
+if (!$device || $device['security_mode'] !== 'Armed' || !$device['is_active']) {
+    $status = 'Ignored';
 }
 
-$alertType = $data->alert_type ?? 'Unknown Intrusion';
-$sensorSource = $data->sensor ?? 'Unknown Sensor';
+// Apply detection cooldown
+$cooldown = (int)(get_setting($pdo, 'detection_cooldown') ?? 30);
+if ($cooldown > 0 && $status === 'Unresolved') {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM alerts WHERE device_id = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND) AND status != 'Ignored'");
+    $stmt->execute([$deviceId, $cooldown]);
+    if ($stmt->fetchColumn() > 0) {
+        $status = 'Cooldown';
+    }
+}
+
+// Apply alert delay
+$alertDelay = (int)(get_setting($pdo, 'alert_delay') ?? 0);
 
 // Insert alert to database
-$stmt = $pdo->prepare("INSERT INTO alerts (alert_type, sensor_source) VALUES (?, ?)");
-$stmt->execute([$alertType, $sensorSource]);
+$stmt = $pdo->prepare("INSERT INTO alerts (device_id, alert_type, sensor_source, confidence, status) VALUES (?, ?, ?, ?, ?)");
+$stmt->execute([$deviceId, $alertType, $sensorSource, $confidence, $status]);
+$alertId = $pdo->lastInsertId();
 
-// Trigger Notifications
+if ($status === 'Ignored') {
+    json_response(["status" => "success", "message" => "Ignored - System is Disarmed or device inactive"]);
+}
+
+if ($status === 'Cooldown') {
+    json_response(["status" => "success", "message" => "Cooldown active - alert recorded but notification skipped"]);
+}
+
+// Trigger Notifications (respects delay)
+if ($alertDelay > 0) {
+    sleep($alertDelay);
+}
+
 $notifier = new NotificationEngine($pdo);
-$notifier->sendAlert($alertType, $sensorSource);
+$smsSent = $notifier->sendAlert($alertType, $sensorSource, $deviceId, $confidence);
 
-echo json_encode(["status" => "success", "message" => "Alert processed"]);
+// Update alert with SMS status
+if ($smsSent) {
+    $stmt = $pdo->prepare("UPDATE alerts SET sms_sent = 1 WHERE id = ?");
+    $stmt->execute([$alertId]);
+}
+
+// Log device activity
+$stmt = $pdo->prepare("INSERT INTO device_activity_logs (device_id, action, details) VALUES (?, ?, ?)");
+$stmt->execute([$deviceId, 'Alert Triggered', "$alertType by $sensorSource (Confidence: $confidence%)"]);
+
+json_response(["status" => "success", "message" => "Alert processed", "sms_sent" => $smsSent]);
 ?>

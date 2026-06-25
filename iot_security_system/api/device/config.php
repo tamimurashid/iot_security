@@ -8,16 +8,19 @@ header("Content-Type: application/json");
 $apiKey = $_GET['api_key'] ?? '';
 
 if (!validate_api_key($pdo, $apiKey)) {
-    http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "Unauthorized"]);
-    exit();
+    json_response(["status" => "error", "message" => "Unauthorized"], 401);
 }
 
-// In a real scenario, you might pull these from the `settings` table
+$settings = get_all_settings($pdo);
+
 $config = [
     "status" => "success",
-    "ldr_threshold" => 500, // Example threshold for laser break detection
-    "heartbeat_interval" => 30000 // 30 seconds
+    "buzzer_mode_pir" => $settings['buzzer_mode_pir'] ?? 'beep',
+    "buzzer_mode_laser" => $settings['buzzer_mode_laser'] ?? 'continuous',
+    "buzzer_duration" => intval($settings['buzzer_duration'] ?? 2000),
+    "pir_sensitivity" => $settings['pir_sensitivity'] ?? 'medium',
+    "detection_cooldown" => intval($settings['detection_cooldown'] ?? 30),
+    "motion_confirm_count" => intval($settings['motion_confirm_count'] ?? 1),
 ];
 
 echo json_encode($config);

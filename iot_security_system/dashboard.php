@@ -4,157 +4,241 @@ require_once 'config/database.php';
 require_once 'config/functions.php';
 require_login();
 
+$pageTitle = 'Dashboard';
+$currentPage = 'dashboard';
+
 // Fetch summary stats
-$stmt = $pdo->query("SELECT COUNT(*) FROM alerts WHERE DATE(created_at) = CURDATE()");
-$totalIntrusionsToday = $stmt->fetchColumn();
+$totalDevices = get_count($pdo, "SELECT COUNT(*) FROM devices");
+$alertsToday = get_count($pdo, "SELECT COUNT(*) FROM alerts WHERE DATE(created_at) = CURDATE() AND status != 'Ignored'");
+$totalMotion = get_count($pdo, "SELECT COUNT(*) FROM alerts WHERE sensor_source = 'PIR'");
+$totalBeamBreaks = get_count($pdo, "SELECT COUNT(*) FROM alerts WHERE sensor_source = 'Laser'");
+$smsSentToday = get_count($pdo, "SELECT COUNT(*) FROM sms_logs WHERE DATE(created_at) = CURDATE() AND status = 'Success'");
+$unresolvedAlerts = get_count($pdo, "SELECT COUNT(*) FROM alerts WHERE status = 'Unresolved'");
 
-$stmt = $pdo->query("SELECT COUNT(*) FROM alerts WHERE sensor_source = 'PIR'");
-$totalMotionDetections = $stmt->fetchColumn();
+// Fetch all devices
+$stmt = $pdo->query("SELECT * FROM devices ORDER BY last_communication DESC");
+$devices = $stmt->fetchAll();
 
-$stmt = $pdo->query("SELECT COUNT(*) FROM alerts WHERE sensor_source = 'Laser'");
-$totalBeamBreaks = $stmt->fetchColumn();
-
-// Fetch device status
-$stmt = $pdo->query("SELECT * FROM devices WHERE device_id = 'ESP32_NODE_01'");
-$device = $stmt->fetch();
-
-// Check if device is offline (no comms in last 60 seconds)
-$isOffline = true;
-if ($device) {
-    $lastComm = strtotime($device['last_communication']);
+$onlineCount = 0;
+foreach ($devices as &$dev) {
+    $lastComm = strtotime($dev['last_communication']);
     if (time() - $lastComm < 60) {
-        $isOffline = false;
+        $dev['computed_status'] = 'Online';
+        $onlineCount++;
+    } else {
+        $dev['computed_status'] = 'Offline';
     }
 }
-$statusClass = $isOffline ? 'danger' : 'success';
-$statusText = $isOffline ? 'Offline' : 'Online';
+$offlineCount = $totalDevices - $onlineCount;
+
+// Recent alerts
+$stmt = $pdo->query("SELECT a.*, d.device_name FROM alerts a LEFT JOIN devices d ON a.device_id = d.device_id ORDER BY a.id DESC LIMIT 8");
+$recentAlerts = $stmt->fetchAll();
 
 // Handle mode toggle
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_mode'])) {
     verify_csrf_token($_POST['csrf_token'] ?? '');
-    $newMode = ($device['security_mode'] === 'Armed') ? 'Disarmed' : 'Armed';
-    $stmt = $pdo->prepare("UPDATE devices SET security_mode = ? WHERE device_id = 'ESP32_NODE_01'");
-    $stmt->execute([$newMode]);
-    log_system_action($pdo, "System Mode Changed to " . $newMode, $_SESSION['user_id']);
+    $deviceId = $_POST['device_id'] ?? '';
+    $stmt = $pdo->prepare("SELECT security_mode FROM devices WHERE device_id = ?");
+    $stmt->execute([$deviceId]);
+    $device = $stmt->fetch();
+    if ($device) {
+        $newMode = ($device['security_mode'] === 'Armed') ? 'Disarmed' : 'Armed';
+        $stmt = $pdo->prepare("UPDATE devices SET security_mode = ? WHERE device_id = ?");
+        $stmt->execute([$newMode, $deviceId]);
+        log_audit($pdo, "Device Mode Changed", "Device $deviceId → $newMode");
+    }
     header("Location: dashboard.php");
     exit();
 }
+
+include 'includes/header.php';
+include 'includes/sidebar.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - IoT Security System</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-    <div class="wrapper">
-        <nav class="sidebar">
-            <div class="sidebar-header">
-                <h2><i class="fa-solid fa-shield"></i> IoT Sec</h2>
-            </div>
-            <ul class="nav-links">
-                <li class="active"><a href="dashboard.php"><i class="fa-solid fa-gauge"></i> Dashboard</a></li>
-                <li><a href="alerts.php"><i class="fa-solid fa-bell"></i> Alerts</a></li>
-                <li><a href="settings.php"><i class="fa-solid fa-gear"></i> Settings</a></li>
-                <li><a href="logout.php"><i class="fa-solid fa-right-from-bracket"></i> Logout</a></li>
-            </ul>
-        </nav>
-        
-        <main class="main-content">
-            <header class="topbar">
-                <h1>Dashboard</h1>
-                <div class="user-info">
-                    <span>Admin</span>
-                    <i class="fa-solid fa-user-circle"></i>
-                </div>
-            </header>
 
-            <div class="dashboard-cards">
-                <div class="card">
-                    <div class="card-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                    <div class="card-info">
-                        <h3>Total Intrusions (Today)</h3>
-                        <p><?= h($totalIntrusionsToday) ?></p>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-icon"><i class="fa-solid fa-person-running"></i></div>
-                    <div class="card-info">
-                        <h3>Total Motion Detections</h3>
-                        <p><?= h($totalMotionDetections) ?></p>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-icon"><i class="fa-solid fa-bolt"></i></div>
-                    <div class="card-info">
-                        <h3>Total Beam Breaks</h3>
-                        <p><?= h($totalBeamBreaks) ?></p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="dashboard-grid">
-                <div class="panel">
-                    <h2>Device Status</h2>
-                    <div class="status-indicator">
-                        <span class="badge badge-<?= h($statusClass) ?>"><?= h($statusText) ?></span>
-                        <p>Last Communication: <?= $device ? h($device['last_communication']) : 'Never' ?></p>
-                    </div>
-                    
-                    <div class="sensor-status">
-                        <p><strong>PIR Sensor:</strong> <?= ($device && $device['pir_status']) ? '<span class="text-danger">Motion Detected</span>' : 'Clear' ?></p>
-                        <p><strong>Laser Module:</strong> <?= ($device && $device['laser_status']) ? '<span class="text-danger">Beam Broken</span>' : 'Intact' ?></p>
-                        <p><strong>LDR Value:</strong> <?= $device ? h($device['ldr_value']) : 0 ?></p>
-                    </div>
-
-                    <div class="mode-control">
-                        <h3>Current Mode: <strong><?= $device ? h($device['security_mode']) : 'Unknown' ?></strong></h3>
-                        <form method="POST">
-                            <input type="hidden" name="csrf_token" value="<?= h(generate_csrf_token()) ?>">
-                            <button type="submit" name="toggle_mode" class="btn btn-warning w-100">Toggle Security Mode</button>
-                        </form>
-                    </div>
-                </div>
-                
-                <div class="panel">
-                    <h2>Recent Alerts</h2>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Type</th>
-                                <th>Sensor</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php
-                            $stmt = $pdo->query("SELECT * FROM alerts ORDER BY id DESC LIMIT 5");
-                            while ($row = $stmt->fetch()):
-                            ?>
-                            <tr>
-                                <td><?= h($row['created_at']) ?></td>
-                                <td><?= h($row['alert_type']) ?></td>
-                                <td><?= h($row['sensor_source']) ?></td>
-                                <td><span class="badge badge-warning"><?= h($row['status']) ?></span></td>
-                            </tr>
-                            <?php endwhile; ?>
-                        </tbody>
-                    </table>
-                    <a href="alerts.php" class="btn btn-primary" style="margin-top:15px; display:inline-block;">View All Alerts</a>
-                </div>
-            </div>
-            
-            <div class="panel mt-20">
-                <h2>Alert History</h2>
-                <canvas id="alertChart"></canvas>
-            </div>
-        </main>
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stat-card" id="stat-devices">
+        <div class="stat-icon gradient-blue"><i class="fa-solid fa-microchip"></i></div>
+        <div class="stat-content">
+            <span class="stat-label">Total Devices</span>
+            <span class="stat-value"><?= $totalDevices ?></span>
+        </div>
     </div>
-    <script src="assets/js/app.js"></script>
-</body>
-</html>
+    <div class="stat-card" id="stat-online">
+        <div class="stat-icon gradient-green"><i class="fa-solid fa-wifi"></i></div>
+        <div class="stat-content">
+            <span class="stat-label">Online</span>
+            <span class="stat-value"><?= $onlineCount ?></span>
+        </div>
+    </div>
+    <div class="stat-card" id="stat-offline">
+        <div class="stat-icon gradient-red"><i class="fa-solid fa-plug-circle-xmark"></i></div>
+        <div class="stat-content">
+            <span class="stat-label">Offline</span>
+            <span class="stat-value"><?= $offlineCount ?></span>
+        </div>
+    </div>
+    <div class="stat-card" id="stat-alerts">
+        <div class="stat-icon gradient-orange"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="stat-content">
+            <span class="stat-label">Alerts Today</span>
+            <span class="stat-value"><?= $alertsToday ?></span>
+        </div>
+    </div>
+    <div class="stat-card" id="stat-sms">
+        <div class="stat-icon gradient-purple"><i class="fa-solid fa-comment-sms"></i></div>
+        <div class="stat-content">
+            <span class="stat-label">SMS Sent Today</span>
+            <span class="stat-value"><?= $smsSentToday ?></span>
+        </div>
+    </div>
+    <div class="stat-card" id="stat-unresolved">
+        <div class="stat-icon gradient-yellow"><i class="fa-solid fa-clock"></i></div>
+        <div class="stat-content">
+            <span class="stat-label">Unresolved</span>
+            <span class="stat-value"><?= $unresolvedAlerts ?></span>
+        </div>
+    </div>
+</div>
+
+<!-- Devices Grid -->
+<div class="section-header">
+    <h2><i class="fa-solid fa-microchip"></i> Device Status</h2>
+    <a href="devices.php" class="btn btn-outline btn-sm">View All</a>
+</div>
+<div class="devices-grid">
+    <?php foreach ($devices as $dev): ?>
+    <div class="device-card">
+        <div class="device-card-header">
+            <div class="device-name-group">
+                <h3><?= h($dev['device_name'] ?? $dev['device_id']) ?></h3>
+                <span class="device-id"><?= h($dev['device_id']) ?></span>
+            </div>
+            <span class="status-badge <?= $dev['computed_status'] === 'Online' ? 'status-online' : 'status-offline' ?>">
+                <span class="status-dot"></span>
+                <?= $dev['computed_status'] ?>
+            </span>
+        </div>
+        <div class="device-card-body">
+            <div class="device-info-row">
+                <span class="info-label"><i class="fa-solid fa-location-dot"></i> Location</span>
+                <span class="info-value"><?= h($dev['location'] ?? 'Not set') ?></span>
+            </div>
+            <div class="device-info-row">
+                <span class="info-label"><i class="fa-solid fa-person-running"></i> PIR</span>
+                <span class="info-value <?= $dev['pir_status'] ? 'text-danger' : '' ?>">
+                    <?= $dev['pir_status'] ? 'Motion Detected' : 'Clear' ?>
+                </span>
+            </div>
+            <div class="device-info-row">
+                <span class="info-label"><i class="fa-solid fa-bolt"></i> Laser</span>
+                <span class="info-value <?= $dev['laser_status'] ? 'text-danger' : '' ?>">
+                    <?= $dev['laser_status'] ? 'Beam Broken' : 'Intact' ?>
+                </span>
+            </div>
+            <div class="device-info-row">
+                <span class="info-label"><i class="fa-solid fa-sun"></i> LDR</span>
+                <span class="info-value"><?= h($dev['ldr_value']) ?></span>
+            </div>
+            <div class="device-info-row">
+                <span class="info-label"><i class="fa-solid fa-clock"></i> Last Seen</span>
+                <span class="info-value"><?= format_time_ago($dev['last_communication']) ?></span>
+            </div>
+        </div>
+        <div class="device-card-footer">
+            <span class="mode-badge mode-<?= strtolower($dev['security_mode']) ?>">
+                <i class="fa-solid fa-shield-halved"></i> <?= h($dev['security_mode']) ?>
+            </span>
+            <form method="POST" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="<?= h(generate_csrf_token()) ?>">
+                <input type="hidden" name="device_id" value="<?= h($dev['device_id']) ?>">
+                <button type="submit" name="toggle_mode" class="btn btn-sm <?= $dev['security_mode'] === 'Armed' ? 'btn-warning' : 'btn-success' ?>">
+                    <?= $dev['security_mode'] === 'Armed' ? 'Disarm' : 'Arm' ?>
+                </button>
+            </form>
+        </div>
+    </div>
+    <?php endforeach; ?>
+</div>
+
+<!-- Charts + Recent Alerts Row -->
+<div class="dashboard-grid-2col">
+    <div class="panel">
+        <div class="panel-header">
+            <h2><i class="fa-solid fa-chart-line"></i> Alert Trend (7 Days)</h2>
+        </div>
+        <div class="chart-container">
+            <canvas id="alertChart"></canvas>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <h2><i class="fa-solid fa-bell"></i> Recent Alerts</h2>
+            <a href="alerts.php" class="btn btn-outline btn-sm">View All</a>
+        </div>
+        <div class="alerts-list">
+            <?php if (empty($recentAlerts)): ?>
+                <div class="empty-state">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <p>No recent alerts</p>
+                </div>
+            <?php else: ?>
+                <?php foreach ($recentAlerts as $alert): ?>
+                <div class="alert-item">
+                    <div class="alert-item-icon <?= $alert['sensor_source'] === 'PIR' ? 'alert-motion' : 'alert-laser' ?>">
+                        <i class="fa-solid <?= $alert['sensor_source'] === 'PIR' ? 'fa-person-running' : 'fa-bolt' ?>"></i>
+                    </div>
+                    <div class="alert-item-content">
+                        <span class="alert-item-type"><?= h($alert['alert_type']) ?></span>
+                        <span class="alert-item-meta">
+                            <?= h($alert['device_name'] ?? $alert['device_id']) ?> · <?= format_time_ago($alert['created_at']) ?>
+                        </span>
+                    </div>
+                    <span class="status-badge status-<?= strtolower($alert['status']) ?>">
+                        <?= h($alert['status']) ?>
+                    </span>
+                </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- Detection Stats -->
+<div class="dashboard-grid-2col">
+    <div class="panel">
+        <div class="panel-header">
+            <h2><i class="fa-solid fa-chart-pie"></i> Detection Breakdown</h2>
+        </div>
+        <div class="chart-container chart-container-sm">
+            <canvas id="detectionChart"></canvas>
+        </div>
+    </div>
+    <div class="panel">
+        <div class="panel-header">
+            <h2><i class="fa-solid fa-signal"></i> Detection Stats</h2>
+        </div>
+        <div class="stats-summary">
+            <div class="summary-item">
+                <span class="summary-label">Total Motion Detections</span>
+                <span class="summary-value"><?= $totalMotion ?></span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Total Beam Breaks</span>
+                <span class="summary-value"><?= $totalBeamBreaks ?></span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">SMS Notifications Sent</span>
+                <span class="summary-value"><?= $smsSentToday ?></span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Active Devices</span>
+                <span class="summary-value"><?= $onlineCount ?>/<?= $totalDevices ?></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php include 'includes/footer.php'; ?>

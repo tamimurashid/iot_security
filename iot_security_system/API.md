@@ -1,63 +1,67 @@
-# REST API Documentation
+# IoT Security System API Documentation
 
-All API requests require a valid `api_key` sent in the JSON payload or query parameters.
+All API endpoints expect and return JSON. Authentication is handled via the `api_key` parameter (either in the JSON body or as a query parameter).
 
-### 1. Update Device Status
-Used by the ESP32 to send periodic heartbeat and sensor states.
+## Endpoints
 
-**Endpoint:** `POST /api/device/update.php`  
-**Content-Type:** `application/json`
+### 1. Heartbeat / Status Update (`POST /api/device/update.php`)
+Sent by the device periodically to maintain "Online" status and sync basic state. If the `device_id` is unknown, the system will automatically register it.
 
-**Request Body:**
+**Request:**
 ```json
 {
-  "api_key": "YOUR_API_KEY",
-  "device_id": "ESP32_NODE_01",
-  "pir": 0,
-  "laser": 1,
-  "ldr": 850
+    "api_key": "YOUR_API_KEY",
+    "device_id": "ESP32_NODE_01",
+    "firmware": "1.0.2",
+    "pir": 0,
+    "laser": 1,
+    "ldr": 450
 }
 ```
 
-### 2. Send Alert
-Used by the ESP32 when an intrusion is detected. Triggers SMS and Email notifications if enabled and system is Armed.
+### 2. Trigger Alert (`POST /api/device/alert.php`)
+Sent by the device when an intrusion is detected. The server evaluates this against user-defined thresholds (cooldowns, confidence).
 
-**Endpoint:** `POST /api/device/alert.php`  
-**Content-Type:** `application/json`
-
-**Request Body:**
+**Request:**
 ```json
 {
-  "api_key": "YOUR_API_KEY",
-  "device_id": "ESP32_NODE_01",
-  "alert_type": "Motion Intrusion",
-  "sensor": "PIR"
+    "api_key": "YOUR_API_KEY",
+    "device_id": "ESP32_NODE_01",
+    "alert_type": "Motion Intrusion",
+    "sensor": "PIR",
+    "confidence": 95
 }
 ```
 
-### 3. Get Status
-Returns the current security mode (Armed/Disarmed) of the system.
+### 3. Fetch Configuration (`GET /api/device/config.php`)
+Fetched by the device on boot or periodically to sync detection and buzzer settings.
 
-**Endpoint:** `GET /api/device/status.php?api_key=YOUR_API_KEY&device_id=ESP32_NODE_01`
+**Request:**
+`GET /api/device/config.php?api_key=YOUR_API_KEY`
 
 **Response:**
 ```json
 {
-  "status": "success",
-  "mode": "Armed"
+    "status": "success",
+    "buzzer_mode_pir": "beep",
+    "buzzer_mode_laser": "continuous",
+    "buzzer_duration": 2000,
+    "pir_sensitivity": "medium",
+    "detection_cooldown": 30,
+    "motion_confirm_count": 1
 }
 ```
 
-### 4. Get Configuration
-Returns configuration thresholds for the hardware.
+### 4. Device Registration (`POST /api/device/register.php`)
+Optional endpoint for explicit device registration before sending heartbeats.
 
-**Endpoint:** `GET /api/device/config.php?api_key=YOUR_API_KEY`
-
-**Response:**
+**Request:**
 ```json
 {
-  "status": "success",
-  "ldr_threshold": 500,
-  "heartbeat_interval": 30000
+    "api_key": "YOUR_API_KEY",
+    "device_id": "ESP32_NODE_02",
+    "device_name": "Garage Sensor",
+    "location": "North Wall",
+    "firmware_version": "1.0.0"
 }
 ```

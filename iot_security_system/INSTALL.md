@@ -1,61 +1,60 @@
-# Installation and Configuration Guide
+# Installation Guide
 
-## 1. Web Server Setup
-1. Install a local development environment like XAMPP, WAMP, or MAMP (or use a built-in PHP server).
-2. Copy the entire `iot_security_system` folder into the `htdocs` (XAMPP) or `www` (WAMP) directory.
-3. If using the PHP built-in server, navigate to the folder in your terminal and run: `php -S localhost:8001`.
+## 1. Prerequisites
+- PHP 8.0 or higher
+- MySQL / MariaDB (e.g., via MAMP, XAMPP, or natively)
+- Web Server (Apache, Nginx, or PHP Built-in Server)
 
 ## 2. Database Setup
-1. Open your database manager (e.g., phpMyAdmin or a terminal client).
-2. Create a new database named `iot_security`.
-3. Import the `database.sql` file provided in the root directory.
-4. **Default Admin Credentials**:
-   - **Username:** `admin`
-   - **Password:** `admin123`
 
-## 3. Web Configuration
-1. Open `config/database.php` in a text editor.
-2. Update the host, port, database name, username, and password to match your MySQL database configuration. 
-   *(Note: The default is often `root` for the username and `root` or `blank` for the password depending on your setup)*.
+1. Open your MySQL client (e.g., phpMyAdmin or terminal).
+2. Create the database and import the schema:
+   ```bash
+   mysql -u root -p < database.sql
+   ```
+   *Note: The `database.sql` script uses `IF NOT EXISTS` and `ON DUPLICATE KEY`, so it is safe to run against an existing installation without losing device or settings data.*
 
-## 4. Hardware Setup (ESP32)
-1. Open the Arduino IDE.
-2. Install the **ESP32** board package and the **ArduinoJson** library via the Library Manager.
-3. Open `firmware/iot_security_node/iot_security_node.ino`.
-4. Update the WiFi and API configuration at the top of the file:
-   - `WIFI_SSID`: Your WiFi network name.
-   - `WIFI_PASSWORD`: Your WiFi password.
-   - `API_BASE_URL`: The URL to your PHP server (e.g., `http://192.168.1.100/iot_security_system/api/`).
-5. Upload the code to your ESP32.
+3. Configure Database Connection:
+   Open `config/database.php` and update the credentials if necessary:
+   ```php
+   $host = '127.0.0.1'; // Or localhost
+   $db   = 'iot_security';
+   $user = 'root';
+   $pass = 'root';      // MAMP default is usually 'root'
+   ```
 
----
+## 3. Web Server Setup
 
-## 5. Setting up Email & SMS for Better Performance
-For real-time intrusion detection, it is crucial to set up Email and SMS alerts. This ensures that you receive immediate notifications if a security breach occurs, avoiding the need to constantly monitor the dashboard.
+### Using PHP Built-in Server (Development)
+Open a terminal in the root folder (`iot_security_system`) and run:
+```bash
+php -S 0.0.0.0:8000
+```
+Then visit `http://localhost:8000` in your browser.
 
-### A. Email Setup (via SMTP)
-To set up email alerts, you need an SMTP provider (like Gmail, SendGrid, or Mailtrap).
-1. Log in to the web dashboard as `admin`.
-2. Navigate to the **Settings** page.
-3. Fill out the SMTP Configuration:
-   - **SMTP Host:** `smtp.gmail.com` (for Gmail) or your provider's host.
-   - **SMTP Port:** `587` (TLS) or `465` (SSL).
-   - **SMTP Username:** Your email address (e.g., `your-email@gmail.com`).
-   - **SMTP Password:** Your App Password (If using Gmail, do not use your regular password. Generate an "App Password" from your Google Account settings).
-   - **Sender Email:** The email address sending the alerts.
-   - **Recipient Email:** The email address where you want to receive security alerts.
-4. Check **Enable Email Alerts** and click "Save Settings".
+### Using MAMP / XAMPP
+Copy the entire `iot_security_system` folder into your `htdocs` (MAMP/XAMPP) directory and access it via `http://localhost/iot_security_system`.
 
-### B. SMS Setup (via Beam Africa API)
-For immediate fallback when data/internet is unavailable on your mobile device, SMS provides the best performance and reliability.
-1. Create an account with an SMS gateway provider like **Beam Africa** (or Twilio/Nexmo, depending on your integration).
-2. Obtain your **API Token** from your provider's developer dashboard.
-3. Log in to the web dashboard as `admin` and go to **Settings**.
-4. Fill out the SMS Configuration:
-   - **API URL:** `https://api.beamafrica.com/v1/send`
-   - **API Token:** Paste your secret API token.
-   - **Sender Name:** Provide an approved sender ID (e.g., `IOTSEC`).
-   - **Recipient Phone:** Enter your mobile number in international format (e.g., `+1234567890`).
-5. Check **Enable SMS Alerts** and click "Save Settings".
+## 4. Default Credentials
 
-> **Performance Tip:** Ensure the web server hosting this project has a stable internet connection. Because API calls to SMTP and SMS providers block the execution thread until completed, a slow network might delay the dashboard's response when an alert is triggered. For production, consider moving the notification sending logic to a background queue or CRON job.
+- **URL:** `http://localhost:8000/index.php`
+- **Username:** `admin`
+- **Password:** `admin123`
+
+## 5. Beem Africa SMS Configuration
+
+1. Log into the system using the default credentials.
+2. Navigate to **Settings** -> **SMS (Beem Africa)** tab.
+3. Toggle "Enable SMS" to ON.
+4. Enter your Beem Africa **API Key** and **Secret Key**.
+5. Set your **Sender Name** (must be approved by Beem Africa).
+6. Add your **Recipient Phone Number** (e.g., `255712345678`).
+7. Click **Save All Settings**.
+8. Use the **Send Test SMS** button to verify your configuration.
+
+## 6. Device Configuration
+
+1. Navigate to **Devices** and click **Add Device**.
+2. Enter an ID (e.g., `ESP32_NODE_01`) and a Name (e.g., `Front Door`).
+3. Flash your ESP32 with the firmware in `firmware/iot_security_node`.
+4. Ensure the `apiUrl` in `iot_security_node.ino` matches your server's IP address.
