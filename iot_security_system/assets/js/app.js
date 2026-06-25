@@ -123,7 +123,8 @@ async function testSMS() {
         const response = await fetch('api/sms/test.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ recipient, message: 'Test message from IoT Security System' })
+            body: JSON.stringify({ recipient, message: 'Test message from IoT Security System' }),
+            credentials: 'same-origin'
         });
         const data = await response.json();
         
@@ -147,7 +148,7 @@ async function checkSmsBalance() {
     btn.disabled = true;
 
     try {
-        const response = await fetch('api/sms/balance.php');
+        const response = await fetch('api/sms/balance.php', { credentials: 'same-origin' });
         const data = await response.json();
         
         display.style.display = 'flex';
@@ -186,7 +187,7 @@ async function initDashboardCharts() {
 
     // Fetch initial data
     try {
-        const response = await fetch('api/dashboard_data.php');
+        const response = await fetch('api/dashboard_data.php', { credentials: 'same-origin' });
         const data = await response.json();
         
         if (data.status === 'success') {
@@ -274,7 +275,7 @@ function renderCharts(data) {
 
 async function pollDashboardData() {
     try {
-        const response = await fetch('api/dashboard_data.php');
+        const response = await fetch('api/dashboard_data.php', { credentials: 'same-origin' });
         const data = await response.json();
         
         if (data.status === 'success') {
@@ -315,4 +316,3 @@ function updateElementText(selector, text) {
         }, 300);
     }
 }
-});
