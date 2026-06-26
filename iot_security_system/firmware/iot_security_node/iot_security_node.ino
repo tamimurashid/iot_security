@@ -7,11 +7,12 @@
 // WiFi credentials are now managed by WiFiManager
 
 
-String API_BASE_URL = "http://192.168.1.4:8000/api/";
+String API_BASE_URL = "http://192.168.100.7:8000/api/";
 String API_KEY = "EggrollKey123";
 String DEVICE_ID = "ESP32_NODE_01";
 
 // --- Pin Definitions ---
+const int BOOT_BUTTON_PIN = 0;
 const int PIR_PIN = 18;
 const int LASER_PIN = 26; // Providing power to the laser
 const int LDR_PIN = 34;
@@ -37,6 +38,7 @@ bool lastLaserBroken = false;
 void setup() {
   Serial.begin(115200);
   
+  pinMode(BOOT_BUTTON_PIN, INPUT_PULLUP);
   pinMode(PIR_PIN, INPUT);
   pinMode(LASER_PIN, OUTPUT);
   pinMode(LDR_PIN, INPUT);
@@ -51,6 +53,21 @@ void setup() {
 }
 
 void loop() {
+  // Check if BOOT button is pressed to reset WiFi settings
+  if (digitalRead(BOOT_BUTTON_PIN) == LOW) {
+    Serial.println("Boot button pressed! Hold for 3 seconds to reset WiFi...");
+    delay(3000);
+    if (digitalRead(BOOT_BUTTON_PIN) == LOW) {
+      Serial.println("Resetting WiFi credentials...");
+      WiFiManager wm;
+      wm.resetSettings();
+      Serial.println("Restarting...");
+      ESP.restart();
+    } else {
+      Serial.println("Button released. WiFi reset cancelled.");
+    }
+  }
+
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi connection lost. Reconnecting...");
     WiFi.reconnect();
