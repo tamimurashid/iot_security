@@ -97,15 +97,15 @@ void loop() {
   }
   
   // Check Laser (Beam Break)
-  // If LDR value drops below threshold, beam is broken
-  if (ldrValue < LDR_THRESHOLD_LOW) {
+  // If LDR value goes above threshold, beam is broken (inverse logic)
+  if (ldrValue > LDR_THRESHOLD_HIGH) {
     if (!lastLaserBroken) {
       Serial.println("Laser beam broken!");
       sendAlert("Beam Break Intrusion", "Laser");
       triggerBuzzer(buzzerModeLaser);
       lastLaserBroken = true;
     }
-  } else if (ldrValue > LDR_THRESHOLD_HIGH) {
+  } else if (ldrValue < LDR_THRESHOLD_LOW) {
     if (lastLaserBroken) {
       lastLaserBroken = false;
     }

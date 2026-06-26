@@ -250,8 +250,8 @@ class NotificationEngine {
     }
 
     private function logSMS($recipient, $message, $status, $response = null) {
-        $stmt = $this->pdo->prepare("INSERT INTO sms_logs (recipient, message, status, response) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$recipient, $message, $status, $response]);
+        $stmt = $this->pdo->prepare("INSERT INTO sms_logs (recipient, message, status) VALUES (?, ?, ?)");
+        $stmt->execute([$recipient, $message, $status]);
     }
 
     private function logEmail($recipient, $subject, $status) {
