@@ -116,11 +116,14 @@ class NotificationEngine {
             ];
         }
 
+        // Strip non-ASCII characters (like emojis) to prevent HTTP 400 errors with encoding 0
+        $cleanMessage = preg_replace('/[^\x20-\x7E\n\r]/', '', $message);
+
         $payload = [
             'source_addr' => $senderName,
             'schedule_time' => '',
             'encoding' => 0,
-            'message' => $message,
+            'message' => trim($cleanMessage),
             'recipients' => $recipients
         ];
 
